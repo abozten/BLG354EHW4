@@ -7,7 +7,7 @@ import os
 
 # --- Constants ---
 CASCADE_PATH = "haarcascade_frontalface_default.xml"
-DEFAULT_VIDEO = "data1.npy" # Default file to load if no video is provided
+DEFAULT_VIDEO = "berra.mp4" # Default file to load if no video is provided
 
 # Face detection and ROI parameters
 MIN_FACE_SIZE = 100
