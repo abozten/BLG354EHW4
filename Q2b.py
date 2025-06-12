@@ -1,4 +1,5 @@
-
+#Arda Barış Özten - 820220303
+#Berra Mutlu - 820220331
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import convolve
@@ -122,6 +123,7 @@ plt.axvline(x=target_range[0], color='r', linestyle='--', label=f'Target 1 @ {ta
 plt.axvline(x=target_range[1], color='g', linestyle='--', label=f'Target 2 @ {target_range[1]} km')
 plt.legend()
 plt.tight_layout()
+plt.savefig("q2b_matched_filter_output_first_pulse.png")  # Save figure
 
 # 5. Plot the 2D range-pulse map after matched filtering
 plt.figure(figsize=(10, 7))
@@ -132,6 +134,7 @@ plt.xlabel('Pulse Number')
 plt.ylabel('Range (km)')
 plt.colorbar(label='Magnitude')
 plt.tight_layout()
+plt.savefig("q2b_range_vs_pulse_matched_filtering.png")  # Save figure
 
 plt.show()
 

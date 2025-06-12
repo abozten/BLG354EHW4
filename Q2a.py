@@ -1,3 +1,5 @@
+#Arda Barış Özten - 820220303
+#Berra Mutlu - 820220331
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -42,6 +44,8 @@ def plotspec(x, Ts):
     plt.grid(True)
     plt.tight_layout()
 
+    plt.savefig("q2a_chirp_spectrum.png")  # Save the spectrum plot
+
     return fxs, freqs
     
 # Add parameters from the homework description PDF
@@ -64,6 +68,7 @@ plt.title('Real part of sofn')
 plt.xlabel('n (sample index)')
 plt.ylabel('Real Part')
 plt.grid(True)
+plt.savefig("q2a_chirp_real_part.png")  # Save the real part plot
 
 # 3. Compute and plot the spectrum of the chirp signal
 Ts = 1 / fs_param
@@ -71,4 +76,4 @@ plotspec(sofn, Ts)
 
 # 4. Display all generated plots
 plt.show()
-    
+

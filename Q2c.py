@@ -126,5 +126,8 @@ else:
 # Plot the Range-Doppler Map with detections marked
 plot_doppler_range_map(RDmapw, R_spec, vel_axis, targets)
 
+# Save the plot to a file
+plt.savefig("q2c_RDmapw_with_detections.png")
+
 plt.show()
 

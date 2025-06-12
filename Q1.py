@@ -77,6 +77,7 @@ plt.ylabel("Normalized Magnitude")
 plt.title("Spectrum of Original and Modulated Signals")
 plt.legend()
 plt.grid(True)
+plt.savefig("q1_spectrum_original_modulated.png")
 plt.show()
 
 # Design lowpass filter
@@ -96,6 +97,7 @@ plt.ylabel("Magnitude")
 plt.title("LPF and Signal Spectra")
 plt.legend()
 plt.grid(True)
+plt.savefig("q1_lpf_and_signal_spectra.png")
 plt.show()
 
 # Demodulate with LPF

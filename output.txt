@@ -1,0 +1,16 @@
+Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q1.py
+Original shape: (338688, 2)
+Sampling frequency: 44100
+Mean Squared Error: 0.0055
+
+Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2a.py
+.venvabozten@Arda-MacBook-Air BLG354EhomeworkIV % /Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/.venv/bin/python /
+Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2b.py
+Shape of simulated return y: (501, 12)
+.venvabozten@Arda-MacBook-Air BLG354EhomeworkIV % /Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/.venv/bin/python /
+Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2c.py
+Loaded data from 'rad100.npy', shape: (501, 12)
+No detections found above threshold=90. You might need to lower it.
+
+No targets were detected with the current threshold.
+
