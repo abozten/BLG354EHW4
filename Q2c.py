@@ -113,7 +113,7 @@ plt.colorbar(label='Magnitude')
 plt.tight_layout()
 
 # you can make the detection automaticly by setting a threshold to choose targets above the threshold
-targets = detect_targets_clustered(RDmapw, R_spec, vel_axis, thresh=90)
+targets = detect_targets_clustered(RDmapw, R_spec, vel_axis, thresh=60)
 
 # Print detection results
 if targets:
