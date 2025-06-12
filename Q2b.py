@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import convolve
@@ -67,7 +68,7 @@ def dchirp(TW, p):
 # --- Radar parameters ---	
 fc = 10e3         # MHz (10 GHz)
 fs = 10           # MHz
-T = 10           # µs
+T = 10            # µs
 W = 5             # MHz
 Nrange = 501      # Sample number in range direction
 Npulses = 12      # Pulse number
@@ -75,8 +76,10 @@ PRI = 200         # µs
 c = 0.3           # km/µs
 
 # --- Chirp waveform (equivalent to dchirp) ---
-
 # to do create chirp pulse s
+TW = T * W
+p = fs / W
+s = dchirp(TW, p)
 
 
 # --- Target parameters --- number of target parameter in each array must MATCH with each other
@@ -92,4 +95,43 @@ T_ref = 0
 
 # --- Simulate radar return ---
 y = radar(s, fs, T_0, g, T_out, T_ref, fc, target_range, target_amp, target_velocity)
-print(y.shape) # it should be matrix y[Nrange, Npulses]
+print(f"Shape of simulated return y: {y.shape}") # it should be matrix y[Nrange, Npulses]
+
+# --- Matched Filtering and Plotting (as per homework PDF description) ---
+# 1. Create the matched filter (time-reversed conjugate of the pulse)
+matched_filter = np.conj(np.flip(s))
+
+# 2. Convolve each pulse return (column of y) with the matched filter
+x_conv = np.zeros_like(y, dtype=complex)
+for i in range(Npulses):
+    x_conv[:, i] = convolve(y[:, i], matched_filter, mode='same')
+
+# 3. Create the range axis for plotting using the formula from the homework PDF
+# Units: c in km/us, fs in MHz, T in us, T_out in us. Result is in km.
+R_spec = (c / 2) * (np.arange(Nrange) / fs - T / 2 + T_out[0])
+
+# 4. Plot the magnitude of the matched filter output for the first pulse
+plt.figure(figsize=(12, 6))
+plt.plot(R_spec, np.abs(x_conv[:, 0])) # Plotting the first pulse return
+plt.title('Matched Filter Output vs. Range (First Pulse)')
+plt.xlabel('Range (km)')
+plt.ylabel('Magnitude')
+plt.grid(True)
+# Mark the expected target locations for verification
+plt.axvline(x=target_range[0], color='r', linestyle='--', label=f'Target 1 @ {target_range[0]} km')
+plt.axvline(x=target_range[1], color='g', linestyle='--', label=f'Target 2 @ {target_range[1]} km')
+plt.legend()
+plt.tight_layout()
+
+# 5. Plot the 2D range-pulse map after matched filtering
+plt.figure(figsize=(10, 7))
+plt.imshow(np.abs(x_conv), aspect='auto', origin='lower',
+           extent=[0, Npulses-1, R_spec[0], R_spec[-1]])
+plt.title('Range vs. Pulse Number (After Matched Filtering)')
+plt.xlabel('Pulse Number')
+plt.ylabel('Range (km)')
+plt.colorbar(label='Magnitude')
+plt.tight_layout()
+
+plt.show()
+
