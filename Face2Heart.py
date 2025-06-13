@@ -3,11 +3,12 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import FastICA
+from scipy.signal import detrend, butter, filtfilt # Added imports
 import os
 
 # --- Constants ---
 CASCADE_PATH = "haarcascade_frontalface_default.xml"
-DEFAULT_VIDEO = "berra.mp4" # Default file to load if no video is provided
+DEFAULT_VIDEO = "data1.npy" # Default file to load if no video is provided
 
 # Face detection and ROI parameters
 MIN_FACE_SIZE = 100
@@ -104,6 +105,11 @@ def getBestROI(frame, faceCascade, previousFaceBox):
     return faceBox, roi, frame
 
 
+# --- Add a new constant at the top of your script ---
+ROI_SIZE = (128, 128) # A fixed size for all ROIs, e.g., 128x128 pixels
+
+# --- Here is the MODIFIED function ---
+
 def process_video_to_roi_array(video_path):
     """
     Reads a video file, performs face tracking, extracts ROIs,
@@ -132,12 +138,14 @@ def process_video_to_roi_array(video_path):
         if not ret:
             break
 
-        # Some videos might be rotated
-        # frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
         previousFaceBox, roi, display_frame = getBestROI(frame, faceCascade, previousFaceBox)
 
         if roi is not None and roi.size > 0:
+            # --- THIS IS THE FIX ---
+            # Resize the ROI to our standard size to ensure all are the same.
+            roi = cv2.resize(roi, ROI_SIZE)
+            # --- END OF FIX ---
+
             # Convert to RGB for matplotlib consistency
             roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
             roi_frames.append(roi_rgb)
@@ -155,8 +163,8 @@ def process_video_to_roi_array(video_path):
     if not roi_frames:
         raise ValueError("Could not extract any ROIs from the video.")
         
+    # Now this line will work because all elements in roi_frames have the same shape
     return np.array(roi_frames), fps
-
 
 # --- Part 2: Signal Analysis for Heart Rate ---
 
@@ -189,13 +197,20 @@ def analyze_pulse(video_data, fps):
     mean_rgb = np.mean(spatially_pooled_rgb, axis=0)
     std_rgb = np.std(spatially_pooled_rgb, axis=0)
     normalized_rgb = (spatially_pooled_rgb - mean_rgb) / std_rgb
+
+    # --- Step 2a: Detrending ---
+    # Apply detrending to remove slow-moving lighting changes.
+    print("Step 2a: Detrending signals...")
+    detrended_rgb = np.zeros_like(normalized_rgb)
+    for i in range(normalized_rgb.shape[1]): # Detrend each channel
+        detrended_rgb[:, i] = detrend(normalized_rgb[:, i])
     
-    # Plot the normalized RGB signals
+    # Plot the detrended RGB signals
     plt.figure(figsize=(12, 4))
-    plt.plot(normalized_rgb[:, 0], 'r', label='Red Channel')
-    plt.plot(normalized_rgb[:, 1], 'g', label='Green Channel')
-    plt.plot(normalized_rgb[:, 2], 'b', label='Blue Channel')
-    plt.title("Normalized RGB Signal")
+    plt.plot(detrended_rgb[:, 0], 'r', label='Red Channel (Detrended)')
+    plt.plot(detrended_rgb[:, 1], 'g', label='Green Channel (Detrended)')
+    plt.plot(detrended_rgb[:, 2], 'b', label='Blue Channel (Detrended)')
+    plt.title("Detrended Normalized RGB Signal")
     plt.xlabel("Frame")
     plt.ylabel("Standardized Value")
     plt.legend()
@@ -205,14 +220,49 @@ def analyze_pulse(video_data, fps):
     # Use FastICA to unmix the signals into independent sources.
     print("Step 3: Applying Independent Component Analysis (ICA)...")
     ica = FastICA(n_components=3, random_state=0, whiten='unit-variance')
-    source_signals = ica.fit_transform(normalized_rgb)
+    source_signals_raw = ica.fit_transform(detrended_rgb) # Use detrended_rgb
+
+    # --- Step 3a: Bandpass Filtering ---
+    # Filter the ICA source signals to only keep frequencies within the valid heart rate range.
+    print("Step 3a: Applying bandpass filter to ICA signals...")
+    min_hz_filter = MIN_BPM / 60.0
+    max_hz_filter = MAX_BPM / 60.0
     
-    # Plot the extracted source signals
-    plt.figure(figsize=(12, 4))
-    plt.plot(source_signals[:, 0], label='Source 1')
-    plt.plot(source_signals[:, 1], label='Source 2 (often the pulse)')
-    plt.plot(source_signals[:, 2], label='Source 3')
-    plt.title("ICA Source Signals")
+    def bandpass_filter(data, lowcut, highcut, fs, order=5):
+        nyq = 0.5 * fs
+        low = lowcut / nyq
+        high = highcut / nyq
+        # Ensure low and high are within (0, 1)
+        low = max(0.001, min(low, 0.999))
+        high = max(0.001, min(high, 0.999))
+        if low >= high: # If lowcut is too close or higher than highcut after adjustment
+            print(f"Warning: Invalid frequency range for bandpass filter: low={low*nyq:.2f}Hz, high={high*nyq:.2f}Hz. Skipping filter for this component.")
+            return data # Return original data if filter range is invalid
+        b, a = butter(order, [low, high], btype='band')
+        y = filtfilt(b, a, data, axis=0)
+        return y
+
+    source_signals = np.zeros_like(source_signals_raw)
+    for i in range(source_signals_raw.shape[1]):
+        source_signals[:, i] = bandpass_filter(source_signals_raw[:, i], min_hz_filter, max_hz_filter, fps)
+    
+    # Plot the extracted source signals (raw and filtered)
+    plt.figure(figsize=(12, 8))
+    plt.subplot(2, 1, 1)
+    plt.plot(source_signals_raw[:, 0], label='Raw Source 1')
+    plt.plot(source_signals_raw[:, 1], label='Raw Source 2 (often the pulse)')
+    plt.plot(source_signals_raw[:, 2], label='Raw Source 3')
+    plt.title("ICA Source Signals (Raw - Before Bandpass)")
+    plt.xlabel("Frame")
+    plt.ylabel("Signal Amplitude")
+    plt.legend()
+    plt.grid(True)
+
+    plt.subplot(2, 1, 2)
+    plt.plot(source_signals[:, 0], label='Filtered Source 1')
+    plt.plot(source_signals[:, 1], label='Filtered Source 2 (often the pulse)')
+    plt.plot(source_signals[:, 2], label='Filtered Source 3')
+    plt.title("ICA Source Signals (Bandpass Filtered)")
     plt.xlabel("Frame")
     plt.ylabel("Signal Amplitude")
     plt.legend()
