@@ -135,19 +135,130 @@ def process_video_to_roi_array(video_path):
 
 # --- Part 2: Signal Analysis for Heart Rate ---
 
+# --- (Keep all other functions and imports the same) ---
+
 def analyze_pulse(video_data, fps):
     """
     Performs the full analysis pipeline on the ROI data to find the heart rate.
-    This UPGRADED version includes forehead ROI, detrending, and bandpass filtering.
+    This DEFINITIVE version has ACCURATE component selection and PDF-COMPLIANT plots.
     """
-    print("\n--- Starting Heart Rate Analysis (Upgraded) ---")
+    print("\n--- Starting Heart Rate Analysis (Definitive Version) ---")
+    
+    # === Step 1-3: Signal Preparation ===
+    print("Steps 1-3: Pooling, Detrending, and Normalizing...")
+    spatially_pooled_rgb = np.mean(video_data, axis=(1, 2))
+    detrended_rgb = np.zeros_like(spatially_pooled_rgb)
+    for i in range(spatially_pooled_rgb.shape[1]):
+        detrended_rgb[:, i] = detrend(spatially_pooled_rgb[:, i])
+    mean_rgb = np.mean(detrended_rgb, axis=0)
+    std_rgb = np.std(detrended_rgb, axis=0)
+    normalized_rgb = (detrended_rgb - mean_rgb) / (std_rgb + 1e-6)
+
+    # === Step 4: ICA ===
+    print("Step 4: Applying Independent Component Analysis (ICA)...")
+    ica = FastICA(n_components=3, random_state=0, whiten='unit-variance', max_iter=1000)
+    source_signals = ica.fit_transform(normalized_rgb)
+
+    # === Step 5: Power Spectrum Calculation for ALL signals ===
+    print("Step 5: Calculating power spectra for all signals...")
+    n_samples = len(normalized_rgb)
+    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
+    green_power_spectrum = np.abs(np.fft.fft(normalized_rgb[:, 1]))**2
+    ica_power_spectra = np.abs(np.fft.fft(source_signals, axis=0))**2
+    
+    # === Plotting Window 1: PDF Compliance Plots ===
+    print("Generating diagnostic plots required by PDF...")
+    plt.figure(figsize=(12, 8))
+    
+    # Plot 1: ICA Source Signals (Time-Domain)
+    plt.subplot(2, 1, 1)
+    plt.title("Extracted ICA Source Signals (Time-Domain)")
+    plt.plot(source_signals[:, 0], label='Source 1')
+    plt.plot(source_signals[:, 1], label='Source 2')
+    plt.plot(source_signals[:, 2], label='Source 3')
+    plt.xlabel("Frame")
+    plt.ylabel("Signal Amplitude")
+    plt.grid(True)
+    plt.legend()
+    
+    # Plot 2: Power Spectra of all ICA Sources
+    min_hz = MIN_BPM / 60.0
+    max_hz = MAX_BPM / 60.0
+    plt.subplot(2, 1, 2)
+    plt.title("Power Spectra of all ICA Sources")
+    plt.plot(freqs, ica_power_spectra[:, 0], label='Source 1 Power')
+    plt.plot(freqs, ica_power_spectra[:, 1], label='Source 2 Power')
+    plt.plot(freqs, ica_power_spectra[:, 2], label='Source 3 Power')
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Power")
+    plt.xlim(min_hz, max_hz)
+    plt.grid(True)
+    plt.legend()
+    
+    plt.tight_layout()
+
+    # === Step 6: Intelligent Component Selection ===
+    print("Step 6: Selecting best component via Green Channel correlation...")
+    best_component_idx = -1
+    max_correlation = -1
+    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
+    
+    for i in range(source_signals.shape[1]):
+        correlation = np.corrcoef(
+            green_power_spectrum[valid_indices], 
+            ica_power_spectra[valid_indices, i]
+        )[0, 1]
+        print(f"Component {i+1} correlation with Green channel: {correlation:.4f}")
+        if correlation > max_correlation:
+            max_correlation = correlation
+            best_component_idx = i
+
+    print(f"==> Selected Component {best_component_idx + 1} as most likely pulse signal.")
+
+    # === Step 7: Filtering and Final Extraction ===
+    print("Step 7: Filtering chosen component and extracting final heart rate...")
+    def bandpass_filter(data, lowcut, highcut, fs, order=5):
+        nyq = 0.5 * fs
+        low, high = lowcut / nyq, highcut / nyq
+        b, a = butter(order, [low, high], btype='band')
+        return filtfilt(b, a, data, axis=0)
+
+    filtered_pulse_signal = bandpass_filter(source_signals[:, best_component_idx], min_hz, max_hz, fps)
+    final_power_spectrum = np.abs(np.fft.fft(filtered_pulse_signal))**2
+    
+    peak_index_in_cropped = np.argmax(final_power_spectrum[valid_indices])
+    dominant_freq_hz = freqs[valid_indices][peak_index_in_cropped]
+    final_heart_rate = dominant_freq_hz * 60.0
+
+    print("\n--- Results ---")
+    print(f"==> Final Estimated Heart Rate: {final_heart_rate:.2f} BPM")
+    
+    # === Plotting Window 2: Final Result Verification ===
+    plt.figure(figsize=(10, 5))
+    plt.title("Final Result: Power Spectrum of Chosen Component")
+    plt.plot(freqs, final_power_spectrum, label=f'Chosen Component ({best_component_idx+1}) Power')
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Power")
+    plt.xlim([min_hz, max_hz])
+    plt.axvline(x=dominant_freq_hz, color='r', linestyle='--', label=f'Detected Peak ({final_heart_rate:.2f} BPM)')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    # Show all generated plot windows
+    plt.show()
+    """
+    Performs the full analysis pipeline on the ROI data to find the heart rate.
+    This FINAL version includes intelligent component selection based on the green channel.
+    """
+    print("\n--- Starting Heart Rate Analysis (Intelligent Selection) ---")
     
     # Step 1: Spatial Pooling
     print("Step 1: Performing spatial pooling on ROI data...")
     spatially_pooled_rgb = np.mean(video_data, axis=(1, 2))
     
     # Step 2: Detrending
-    print("Step 2: Detrending signals to remove slow lighting changes...")
+    print("Step 2: Detrending signals...")
     detrended_rgb = np.zeros_like(spatially_pooled_rgb)
     for i in range(spatially_pooled_rgb.shape[1]):
         detrended_rgb[:, i] = detrend(spatially_pooled_rgb[:, i])
@@ -163,10 +274,44 @@ def analyze_pulse(video_data, fps):
     ica = FastICA(n_components=3, random_state=0, whiten='unit-variance', max_iter=1000)
     source_signals = ica.fit_transform(normalized_rgb)
 
-    # Step 5: Bandpass Filtering
-    print("Step 5: Applying bandpass filter to ICA signals...")
+    # --- Step 5: Intelligent Component Selection ---
+    print("Step 5: Selecting best component based on Green Channel correlation...")
+    
+    # Calculate power spectrum for all signals
+    n_samples = len(normalized_rgb)
+    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
+    
+    # Get power spectrum of the original GREEN channel
+    green_power_spectrum = np.abs(np.fft.fft(normalized_rgb[:, 1]))**2
+    
+    # Get power spectra of the ICA source signals
+    ica_power_spectra = np.abs(np.fft.fft(source_signals, axis=0))**2
+    
+    # Find the component most correlated with the green channel's spectrum
+    best_component_idx = -1
+    max_correlation = -1
+    
     min_hz = MIN_BPM / 60.0
     max_hz = MAX_BPM / 60.0
+    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
+    
+    for i in range(source_signals.shape[1]):
+        # Compare the shape of the power spectra in the valid frequency range
+        correlation = np.corrcoef(
+            green_power_spectrum[valid_indices], 
+            ica_power_spectra[valid_indices, i]
+        )[0, 1]
+        
+        print(f"Component {i+1} correlation with Green channel: {correlation:.4f}")
+        
+        if correlation > max_correlation:
+            max_correlation = correlation
+            best_component_idx = i
+
+    print(f"==> Selected Component {best_component_idx + 1} as most likely pulse signal.")
+
+    # --- Step 6: Bandpass Filter ONLY the selected component ---
+    print(f"Step 6: Applying bandpass filter to selected component ({best_component_idx + 1})...")
     
     def bandpass_filter(data, lowcut, highcut, fs, order=5):
         nyq = 0.5 * fs
@@ -175,67 +320,35 @@ def analyze_pulse(video_data, fps):
         b, a = butter(order, [low, high], btype='band')
         return filtfilt(b, a, data, axis=0)
 
-    filtered_sources = bandpass_filter(source_signals, min_hz, max_hz, fps)
+    # We filter the chosen raw source signal
+    filtered_pulse_signal = bandpass_filter(source_signals[:, best_component_idx], min_hz, max_hz, fps)
     
-    # Step 6: Power Spectrum Analysis
-    print("Step 6: Calculating power spectrum of filtered source signals...")
-    n_samples = len(filtered_sources)
-    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
-    power_spectra = np.abs(np.fft.fft(filtered_sources, axis=0))**2
+    # --- Step 7: Final Heart Rate Extraction ---
+    print("Step 7: Calculating power spectrum and extracting final heart rate...")
+    final_power_spectrum = np.abs(np.fft.fft(filtered_pulse_signal))**2
     
-    # Plotting for debug
-    plt.figure(figsize=(14, 10))
-    plt.subplot(2, 1, 1)
-    plt.plot(normalized_rgb[:, 0], 'r', alpha=0.7, label='R')
-    plt.plot(normalized_rgb[:, 1], 'g', alpha=0.7, label='G')
-    plt.plot(normalized_rgb[:, 2], 'b', alpha=0.7, label='B')
-    plt.title("Processed RGB Signal (Detrended & Normalized)")
-    plt.legend()
-    plt.grid(True)
+    # Find the peak in the valid frequency range
+    peak_index_in_cropped = np.argmax(final_power_spectrum[valid_indices])
+    # Get the frequency corresponding to that peak
+    dominant_freq_hz = freqs[valid_indices][peak_index_in_cropped]
     
-    plt.subplot(2, 1, 2)
-    plt.plot(freqs, power_spectra[:, 0], label='Source 1 Power')
-    plt.plot(freqs, power_spectra[:, 1], label='Source 2 Power')
-    plt.plot(freqs, power_spectra[:, 2], label='Source 3 Power')
-    plt.title("Power Spectra of Filtered ICA Sources")
+    final_heart_rate = dominant_freq_hz * 60.0
+
+    print("\n--- Results ---")
+    print(f"==> Final Estimated Heart Rate: {final_heart_rate:.2f} BPM")
+    
+    # --- Plotting for Debug ---
+    plt.figure(figsize=(12, 6))
+    plt.plot(freqs, final_power_spectrum, label=f'Chosen Component ({best_component_idx+1}) Power')
+    plt.title("Power Spectrum of Final Chosen Signal")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Power")
     plt.xlim([min_hz, max_hz])
+    plt.axvline(x=dominant_freq_hz, color='r', linestyle='--', label=f'Detected Peak ({final_heart_rate:.2f} BPM)')
+    plt.axvline(x=80/60, color='k', linestyle=':', label='Actual HR (80 BPM)')
     plt.legend()
     plt.grid(True)
-
-    # Step 7: Heart Rate Extraction
-    print("Step 7: Extracting heart rate from dominant frequency...")
-    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
-    
-    all_heart_rates = []
-    all_peak_powers = []
-    
-    for i in range(power_spectra.shape[1]):
-        cropped_power = power_spectra[valid_indices, i].flatten()
-        cropped_freqs = freqs[valid_indices].flatten()
-        if len(cropped_power) == 0: continue
-        peak_index = np.argmax(cropped_power)
-        all_peak_powers.append(cropped_power[peak_index])
-        all_heart_rates.append(cropped_freqs[peak_index] * 60.0)
-    
-    if not all_heart_rates:
-        print("\nError: Could not extract heart rate. No valid peaks found.")
-        return
-
-    best_component_idx = np.argmax(all_peak_powers)
-    final_heart_rate = all_heart_rates[best_component_idx]
-    
-    print("\n--- Results ---")
-    for i in range(len(all_heart_rates)):
-        print(f"Heart rate from Component {i+1}: {all_heart_rates[i]:.2f} BPM (Peak Power: {all_peak_powers[i]:.2e})")
-        
-    print(f"\n==> Best guess is from Component {best_component_idx + 1}.")
-    print(f"==> Estimated Heart Rate: {final_heart_rate:.2f} BPM")
-    
-    plt.tight_layout()
     plt.show()
-
 # --- Main Execution ---
 if __name__ == "__main__":
     video_data = None
