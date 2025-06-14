@@ -3,46 +3,68 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import FastICA
-from scipy.signal import detrend, butter, filtfilt
+from scipy.signal import detrend, butter, filtfilt # Added imports
 import os
 
 # --- Constants ---
 CASCADE_PATH = "haarcascade_frontalface_default.xml"
-DEFAULT_VIDEO = "data1.npy"
+DEFAULT_VIDEO = "data1.npy" # Default file to load if no video is provided
 
 # Face detection and ROI parameters
 MIN_FACE_SIZE = 100
-ROI_SIZE = (128, 128)  # A fixed size for all ROIs, e.g., 128x128 pixels
+WIDTH_FRACTION = 0.6  # Fraction of bounding box width to include in ROI
+HEIGHT_FRACTION = 1.0 # Fraction of bounding box height to include in ROI
 
-# Heart Rate Analysis Parameters
-MIN_BPM = 45.0   # Corresponds to 0.75 Hz
-MAX_BPM = 240.0  # Corresponds to 4.0 Hz
+# --- Heart Rate Analysis Parameters ---
+# As per the homework, the plausible heart rate range is 45 to 240 BPM.
+MIN_BPM = 45.0
+MAX_BPM = 240.0
+# We assume a default FPS for .npy files since this info isn't stored in the array.
+# The homework uses 14.99 in the original script and mentions 30Hz as typical.
+# We will use 30 as a more standard default.
 DEFAULT_FPS = 30.0
+
 
 # --- Part 1: Video Processing and ROI Extraction ---
 
-def get_forehead_roi(image, faceBox):
+def getROI(image, faceBox):
     """
-    Extracts the forehead region from a face box.
-    This is often a more stable region for pulse detection.
+    Extracts the Region of Interest (ROI) from a face box.
+    The ROI is defined by fractions of the face box's width and height.
     """
+    # Adjust bounding box to select a smaller ROI (e.g., forehead and cheeks)
     (x, y, w, h) = faceBox
+    widthOffset = int((1 - WIDTH_FRACTION) * w / 2)
+    heightOffset = int((1 - HEIGHT_FRACTION) * h / 2)
+    roi_x = x + widthOffset
+    roi_y = y + heightOffset
+    roi_w = int(WIDTH_FRACTION * w)
+    roi_h = int(HEIGHT_FRACTION * h)
     
-    # Define forehead area: top 25% of the face box, middle 60% width
-    forehead_x = x + int(w * 0.2)
-    forehead_y = y + int(h * 0.05) # Start a little below the top edge
-    forehead_w = int(w * 0.6)
-    forehead_h = int(h * 0.25)
+    # Create a mask to blank out everything outside the ROI
+    mask = np.full(image.shape[:2], False, dtype=bool)
+    mask[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w] = True
     
-    return image[forehead_y : forehead_y + forehead_h, forehead_x : forehead_x + forehead_w]
+    # Apply mask
+    roi = np.zeros_like(image)
+    roi[mask] = image[mask]
+    
+    # Return the cropped ROI for display, and the masked full image for processing
+    # Note: we return the cropped version for building the video_data array
+    return image[roi_y:roi_y+roi_h, roi_x:roi_x+roi_w]
+
 
 def distance(box1, box2):
     """Calculates the sum of square differences between two bounding boxes."""
     return sum((box1[i] - box2[i])**2 for i in range(len(box1)))
 
+
 def getBestROI(frame, faceCascade, previousFaceBox):
     """
-    Detects faces in a frame and returns the best FOREHEAD ROI.
+    Detects faces in a frame and returns the best ROI.
+    - If one face is found, use it.
+    - If multiple faces are found, use the one closest to the previous frame's face.
+    - If no faces are found, re-use the previous frame's face box.
     """
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = faceCascade.detectMultiScale(
@@ -54,6 +76,7 @@ def getBestROI(frame, faceCascade, previousFaceBox):
         faceBox = previousFaceBox
     elif len(faces) > 1:
         if previousFaceBox is not None:
+            # Find face closest to the one in the previous frame
             minDist = float("inf")
             for face in faces:
                 d = distance(previousFaceBox, face)
@@ -61,28 +84,31 @@ def getBestROI(frame, faceCascade, previousFaceBox):
                     minDist = d
                     faceBox = face
         else:
+            # If no previous face, choose the largest one
             maxArea = 0
             for face in faces:
                 if (face[2] * face[3]) > maxArea:
                     maxArea = face[2] * face[3]
                     faceBox = face
     else:
+        # Only one face was detected
         faceBox = faces[0]
 
     roi = None
     if faceBox is not None:
-        roi = get_forehead_roi(frame, faceBox)
-        # For visualization, draw both face and forehead boxes
+        roi = getROI(frame, faceBox)
+        # For visualization, draw rectangle on the original frame
         (x, y, w, h) = faceBox
         cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 255, 0), 2)
-        
-        forehead_x = x + int(w * 0.2)
-        forehead_y = y + int(h * 0.05)
-        forehead_w = int(w * 0.6)
-        forehead_h = int(h * 0.25)
-        cv2.rectangle(frame, (forehead_x, forehead_y), (forehead_x + forehead_w, forehead_y + forehead_h), (0, 255, 0), 2)
+
 
     return faceBox, roi, frame
+
+
+# --- Add a new constant at the top of your script ---
+ROI_SIZE = (128, 128) # A fixed size for all ROIs, e.g., 128x128 pixels
+
+# --- Here is the MODIFIED function ---
 
 def process_video_to_roi_array(video_path):
     """
@@ -115,10 +141,16 @@ def process_video_to_roi_array(video_path):
         previousFaceBox, roi, display_frame = getBestROI(frame, faceCascade, previousFaceBox)
 
         if roi is not None and roi.size > 0:
+            # --- THIS IS THE FIX ---
+            # Resize the ROI to our standard size to ensure all are the same.
             roi = cv2.resize(roi, ROI_SIZE)
+            # --- END OF FIX ---
+
+            # Convert to RGB for matplotlib consistency
             roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
             roi_frames.append(roi_rgb)
             
+            # Show the tracking in real-time
             cv2.imshow('Face Tracking', display_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -131,224 +163,194 @@ def process_video_to_roi_array(video_path):
     if not roi_frames:
         raise ValueError("Could not extract any ROIs from the video.")
         
+    # Now this line will work because all elements in roi_frames have the same shape
     return np.array(roi_frames), fps
 
 # --- Part 2: Signal Analysis for Heart Rate ---
 
-# --- (Keep all other functions and imports the same) ---
-
 def analyze_pulse(video_data, fps):
     """
     Performs the full analysis pipeline on the ROI data to find the heart rate.
-    This DEFINITIVE version has ACCURATE component selection and PDF-COMPLIANT plots.
     """
-    print("\n--- Starting Heart Rate Analysis (Definitive Version) ---")
+    print("\n--- Starting Heart Rate Analysis ---")
     
-    # === Step 1-3: Signal Preparation ===
-    print("Steps 1-3: Pooling, Detrending, and Normalizing...")
-    spatially_pooled_rgb = np.mean(video_data, axis=(1, 2))
-    detrended_rgb = np.zeros_like(spatially_pooled_rgb)
-    for i in range(spatially_pooled_rgb.shape[1]):
-        detrended_rgb[:, i] = detrend(spatially_pooled_rgb[:, i])
-    mean_rgb = np.mean(detrended_rgb, axis=0)
-    std_rgb = np.std(detrended_rgb, axis=0)
-    normalized_rgb = (detrended_rgb - mean_rgb) / (std_rgb + 1e-6)
-
-    # === Step 4: ICA ===
-    print("Step 4: Applying Independent Component Analysis (ICA)...")
-    ica = FastICA(n_components=3, random_state=0, whiten='unit-variance', max_iter=1000)
-    source_signals = ica.fit_transform(normalized_rgb)
-
-    # === Step 5: Power Spectrum Calculation for ALL signals ===
-    print("Step 5: Calculating power spectra for all signals...")
-    n_samples = len(normalized_rgb)
-    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
-    green_power_spectrum = np.abs(np.fft.fft(normalized_rgb[:, 1]))**2
-    ica_power_spectra = np.abs(np.fft.fft(source_signals, axis=0))**2
-    
-    # === Plotting Window 1: PDF Compliance Plots ===
-    print("Generating diagnostic plots required by PDF...")
-    plt.figure(figsize=(12, 8))
-    
-    # Plot 1: ICA Source Signals (Time-Domain)
-    plt.subplot(2, 1, 1)
-    plt.title("Extracted ICA Source Signals (Time-Domain)")
-    plt.plot(source_signals[:, 0], label='Source 1')
-    plt.plot(source_signals[:, 1], label='Source 2')
-    plt.plot(source_signals[:, 2], label='Source 3')
-    plt.xlabel("Frame")
-    plt.ylabel("Signal Amplitude")
-    plt.grid(True)
-    plt.legend()
-    
-    # Plot 2: Power Spectra of all ICA Sources
-    min_hz = MIN_BPM / 60.0
-    max_hz = MAX_BPM / 60.0
-    plt.subplot(2, 1, 2)
-    plt.title("Power Spectra of all ICA Sources")
-    plt.plot(freqs, ica_power_spectra[:, 0], label='Source 1 Power')
-    plt.plot(freqs, ica_power_spectra[:, 1], label='Source 2 Power')
-    plt.plot(freqs, ica_power_spectra[:, 2], label='Source 3 Power')
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Power")
-    plt.xlim(min_hz, max_hz)
-    plt.grid(True)
-    plt.legend()
-    
-    plt.tight_layout()
-
-    # === Step 6: Intelligent Component Selection ===
-    print("Step 6: Selecting best component via Green Channel correlation...")
-    best_component_idx = -1
-    max_correlation = -1
-    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
-    
-    for i in range(source_signals.shape[1]):
-        correlation = np.corrcoef(
-            green_power_spectrum[valid_indices], 
-            ica_power_spectra[valid_indices, i]
-        )[0, 1]
-        print(f"Component {i+1} correlation with Green channel: {correlation:.4f}")
-        if correlation > max_correlation:
-            max_correlation = correlation
-            best_component_idx = i
-
-    print(f"==> Selected Component {best_component_idx + 1} as most likely pulse signal.")
-
-    # === Step 7: Filtering and Final Extraction ===
-    print("Step 7: Filtering chosen component and extracting final heart rate...")
-    def bandpass_filter(data, lowcut, highcut, fs, order=5):
-        nyq = 0.5 * fs
-        low, high = lowcut / nyq, highcut / nyq
-        b, a = butter(order, [low, high], btype='band')
-        return filtfilt(b, a, data, axis=0)
-
-    filtered_pulse_signal = bandpass_filter(source_signals[:, best_component_idx], min_hz, max_hz, fps)
-    final_power_spectrum = np.abs(np.fft.fft(filtered_pulse_signal))**2
-    
-    peak_index_in_cropped = np.argmax(final_power_spectrum[valid_indices])
-    dominant_freq_hz = freqs[valid_indices][peak_index_in_cropped]
-    final_heart_rate = dominant_freq_hz * 60.0
-
-    print("\n--- Results ---")
-    print(f"==> Final Estimated Heart Rate: {final_heart_rate:.2f} BPM")
-    
-    # === Plotting Window 2: Final Result Verification ===
-    plt.figure(figsize=(10, 5))
-    plt.title("Final Result: Power Spectrum of Chosen Component")
-    plt.plot(freqs, final_power_spectrum, label=f'Chosen Component ({best_component_idx+1}) Power')
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Power")
-    plt.xlim([min_hz, max_hz])
-    plt.axvline(x=dominant_freq_hz, color='r', linestyle='--', label=f'Detected Peak ({final_heart_rate:.2f} BPM)')
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-
-    # Show all generated plot windows
-    plt.show()
-    """
-    Performs the full analysis pipeline on the ROI data to find the heart rate.
-    This FINAL version includes intelligent component selection based on the green channel.
-    """
-    print("\n--- Starting Heart Rate Analysis (Intelligent Selection) ---")
-    
-    # Step 1: Spatial Pooling
+    # --- Step 1: Spatial Pooling ---
+    # Average the RGB values across all pixels in the ROI for each frame.
+    # This reduces the 4D (frames, height, width, channels) array to 2D (frames, channels).
     print("Step 1: Performing spatial pooling on ROI data...")
     spatially_pooled_rgb = np.mean(video_data, axis=(1, 2))
     
-    # Step 2: Detrending
-    print("Step 2: Detrending signals...")
-    detrended_rgb = np.zeros_like(spatially_pooled_rgb)
-    for i in range(spatially_pooled_rgb.shape[1]):
-        detrended_rgb[:, i] = detrend(spatially_pooled_rgb[:, i])
-        
-    # Step 3: Normalization
-    print("Step 3: Normalizing signals...")
-    mean_rgb = np.mean(detrended_rgb, axis=0)
-    std_rgb = np.std(detrended_rgb, axis=0)
-    normalized_rgb = (detrended_rgb - mean_rgb) / (std_rgb + 1e-6)
+    # Plot the raw, spatially pooled RGB signal
+    plt.figure(figsize=(12, 4))
+    plt.plot(spatially_pooled_rgb[:, 0], 'r', label='Red Channel')
+    plt.plot(spatially_pooled_rgb[:, 1], 'g', label='Green Channel')
+    plt.plot(spatially_pooled_rgb[:, 2], 'b', label='Blue Channel')
+    plt.title("Spatially Pooled RGB Signal (Raw)")
+    plt.xlabel("Frame")
+    plt.ylabel("Average Pixel Value")
+    plt.legend()
+    plt.grid(True)
+    
+    # --- Step 2: Normalization ---
+    # Standardize each channel to have a mean of 0 and a standard deviation of 1.
+    print("Step 2: Normalizing signals...")
+    mean_rgb = np.mean(spatially_pooled_rgb, axis=0)
+    std_rgb = np.std(spatially_pooled_rgb, axis=0)
+    normalized_rgb = (spatially_pooled_rgb - mean_rgb) / std_rgb
 
-    # Step 4: Independent Component Analysis (ICA)
-    print("Step 4: Applying Independent Component Analysis (ICA)...")
-    ica = FastICA(n_components=3, random_state=0, whiten='unit-variance', max_iter=1000)
-    source_signals = ica.fit_transform(normalized_rgb)
+    # --- Step 2a: Detrending ---
+    # Apply detrending to remove slow-moving lighting changes.
+    print("Step 2a: Detrending signals...")
+    detrended_rgb = np.zeros_like(normalized_rgb)
+    for i in range(normalized_rgb.shape[1]): # Detrend each channel
+        detrended_rgb[:, i] = detrend(normalized_rgb[:, i])
+    
+    # Plot the detrended RGB signals
+    plt.figure(figsize=(12, 4))
+    plt.plot(detrended_rgb[:, 0], 'r', label='Red Channel (Detrended)')
+    plt.plot(detrended_rgb[:, 1], 'g', label='Green Channel (Detrended)')
+    plt.plot(detrended_rgb[:, 2], 'b', label='Blue Channel (Detrended)')
+    plt.title("Detrended Normalized RGB Signal")
+    plt.xlabel("Frame")
+    plt.ylabel("Standardized Value")
+    plt.legend()
+    plt.grid(True)
 
-    # --- Step 5: Intelligent Component Selection ---
-    print("Step 5: Selecting best component based on Green Channel correlation...")
-    
-    # Calculate power spectrum for all signals
-    n_samples = len(normalized_rgb)
-    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
-    
-    # Get power spectrum of the original GREEN channel
-    green_power_spectrum = np.abs(np.fft.fft(normalized_rgb[:, 1]))**2
-    
-    # Get power spectra of the ICA source signals
-    ica_power_spectra = np.abs(np.fft.fft(source_signals, axis=0))**2
-    
-    # Find the component most correlated with the green channel's spectrum
-    best_component_idx = -1
-    max_correlation = -1
-    
-    min_hz = MIN_BPM / 60.0
-    max_hz = MAX_BPM / 60.0
-    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
-    
-    for i in range(source_signals.shape[1]):
-        # Compare the shape of the power spectra in the valid frequency range
-        correlation = np.corrcoef(
-            green_power_spectrum[valid_indices], 
-            ica_power_spectra[valid_indices, i]
-        )[0, 1]
-        
-        print(f"Component {i+1} correlation with Green channel: {correlation:.4f}")
-        
-        if correlation > max_correlation:
-            max_correlation = correlation
-            best_component_idx = i
+    # --- Step 3: Independent Component Analysis (ICA) ---
+    # Use FastICA to unmix the signals into independent sources.
+    print("Step 3: Applying Independent Component Analysis (ICA)...")
+    ica = FastICA(n_components=3, random_state=0, whiten='unit-variance')
+    source_signals_raw = ica.fit_transform(detrended_rgb) # Use detrended_rgb
 
-    print(f"==> Selected Component {best_component_idx + 1} as most likely pulse signal.")
-
-    # --- Step 6: Bandpass Filter ONLY the selected component ---
-    print(f"Step 6: Applying bandpass filter to selected component ({best_component_idx + 1})...")
+    # --- Step 3a: Bandpass Filtering ---
+    # Filter the ICA source signals to only keep frequencies within the valid heart rate range.
+    print("Step 3a: Applying bandpass filter to ICA signals...")
+    min_hz_filter = MIN_BPM / 60.0
+    max_hz_filter = MAX_BPM / 60.0
     
     def bandpass_filter(data, lowcut, highcut, fs, order=5):
         nyq = 0.5 * fs
         low = lowcut / nyq
         high = highcut / nyq
+        # Ensure low and high are within (0, 1)
+        low = max(0.001, min(low, 0.999))
+        high = max(0.001, min(high, 0.999))
+        if low >= high: # If lowcut is too close or higher than highcut after adjustment
+            print(f"Warning: Invalid frequency range for bandpass filter: low={low*nyq:.2f}Hz, high={high*nyq:.2f}Hz. Skipping filter for this component.")
+            return data # Return original data if filter range is invalid
         b, a = butter(order, [low, high], btype='band')
-        return filtfilt(b, a, data, axis=0)
+        y = filtfilt(b, a, data, axis=0)
+        return y
 
-    # We filter the chosen raw source signal
-    filtered_pulse_signal = bandpass_filter(source_signals[:, best_component_idx], min_hz, max_hz, fps)
+    source_signals = np.zeros_like(source_signals_raw)
+    for i in range(source_signals_raw.shape[1]):
+        source_signals[:, i] = bandpass_filter(source_signals_raw[:, i], min_hz_filter, max_hz_filter, fps)
     
-    # --- Step 7: Final Heart Rate Extraction ---
-    print("Step 7: Calculating power spectrum and extracting final heart rate...")
-    final_power_spectrum = np.abs(np.fft.fft(filtered_pulse_signal))**2
-    
-    # Find the peak in the valid frequency range
-    peak_index_in_cropped = np.argmax(final_power_spectrum[valid_indices])
-    # Get the frequency corresponding to that peak
-    dominant_freq_hz = freqs[valid_indices][peak_index_in_cropped]
-    
-    final_heart_rate = dominant_freq_hz * 60.0
-
-    print("\n--- Results ---")
-    print(f"==> Final Estimated Heart Rate: {final_heart_rate:.2f} BPM")
-    
-    # --- Plotting for Debug ---
-    plt.figure(figsize=(12, 6))
-    plt.plot(freqs, final_power_spectrum, label=f'Chosen Component ({best_component_idx+1}) Power')
-    plt.title("Power Spectrum of Final Chosen Signal")
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Power")
-    plt.xlim([min_hz, max_hz])
-    plt.axvline(x=dominant_freq_hz, color='r', linestyle='--', label=f'Detected Peak ({final_heart_rate:.2f} BPM)')
-    plt.axvline(x=80/60, color='k', linestyle=':', label='Actual HR (80 BPM)')
+    # Plot the extracted source signals (raw and filtered)
+    plt.figure(figsize=(12, 8))
+    plt.subplot(2, 1, 1)
+    plt.plot(source_signals_raw[:, 0], label='Raw Source 1')
+    plt.plot(source_signals_raw[:, 1], label='Raw Source 2 (often the pulse)')
+    plt.plot(source_signals_raw[:, 2], label='Raw Source 3')
+    plt.title("ICA Source Signals (Raw - Before Bandpass)")
+    plt.xlabel("Frame")
+    plt.ylabel("Signal Amplitude")
     plt.legend()
     plt.grid(True)
+
+    plt.subplot(2, 1, 2)
+    plt.plot(source_signals[:, 0], label='Filtered Source 1')
+    plt.plot(source_signals[:, 1], label='Filtered Source 2 (often the pulse)')
+    plt.plot(source_signals[:, 2], label='Filtered Source 3')
+    plt.title("ICA Source Signals (Bandpass Filtered)")
+    plt.xlabel("Frame")
+    plt.ylabel("Signal Amplitude")
+    plt.legend()
+    plt.grid(True)
+    
+    # --- Step 4: Power Spectrum Analysis ---
+    # Calculate the power spectrum of each source signal to find dominant frequencies.
+    print("Step 4: Calculating power spectrum of source signals...")
+    n_samples = len(source_signals)
+    # Calculate frequencies for the FFT
+    freqs = np.fft.fftfreq(n_samples, d=1.0/fps)
+    
+    # Calculate power for each source
+    power_spectra = np.abs(np.fft.fft(source_signals, axis=0))**2
+    
+    # Plot the power spectra
+    plt.figure(figsize=(12, 5))
+    for i in range(3):
+        plt.plot(freqs, power_spectra[:, i], label=f'Source {i+1} Power')
+    plt.title("Power Spectra of ICA Sources")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Power")
+    # Limit the x-axis to the specified heart rate range for better visualization
+    plt.xlim([MIN_BPM / 60, MAX_BPM / 60])
+    plt.legend()
+    plt.grid(True)
+
+    # --- Step 5: Heart Rate Extraction ---
+    # Find the dominant frequency in the plausible range [0.75 Hz, 4 Hz].
+    print("Step 5: Extracting heart rate from dominant frequency...")
+    min_hz = MIN_BPM / 60.0
+    max_hz = MAX_BPM / 60.0
+    
+    # Find indices corresponding to the valid frequency range
+    valid_indices = np.where((freqs >= min_hz) & (freqs <= max_hz))
+    
+    all_heart_rates = []
+    all_peak_powers = []
+    
+    for i in range(3):
+        cropped_power = power_spectra[valid_indices, i].flatten()
+        cropped_freqs = freqs[valid_indices].flatten()
+        
+        if len(cropped_power) == 0:
+            print(f"Warning: No frequency components found in the valid range for source {i+1}.")
+            all_heart_rates.append(0)
+            all_peak_powers.append(0)
+            continue
+
+        # Find the peak power in the cropped spectrum
+        peak_index = np.argmax(cropped_power)
+        peak_power = cropped_power[peak_index]
+        
+        # Find the corresponding frequency and convert to BPM
+        dominant_freq_hz = cropped_freqs[peak_index]
+        heart_rate_bpm = dominant_freq_hz * 60.0
+        
+        all_heart_rates.append(heart_rate_bpm)
+        all_peak_powers.append(peak_power)
+    
+    # The best estimate is from the component with the highest peak power
+    best_component_idx = np.argmax(all_peak_powers)
+    final_heart_rate = all_heart_rates[best_component_idx]
+    
+    print("\n--- Results ---")
+    for i in range(3):
+        print(f"Heart rate from Component {i+1}: {all_heart_rates[i]:.2f} BPM (Peak Power: {all_peak_powers[i]:.2e})")
+        
+    print(f"\n==> Best guess is from Component {best_component_idx + 1}.")
+    print(f"==> Estimated Heart Rate: {final_heart_rate:.2f} BPM")
+    
+    # --- Step 6: Further Improvements ---
+    print("\n--- Suggestions for Further Improvements ---")
+    print("1. Detrending: Apply a detrending algorithm (e.g., `scipy.signal.detrend`) to the\n"
+          "   normalized signals before ICA to remove slow-moving lighting changes.")
+    print("2. Bandpass Filtering: Filter the ICA source signals to only keep frequencies\n"
+          "   within the valid heart rate range (e.g., 0.75-4Hz). This can remove noise\n"
+          "   and improve the accuracy of the peak finding.")
+    print("3. Sliding Window Analysis: Instead of one value for the whole video, calculate\n"
+          "   heart rate over a moving window (e.g., 30 seconds) to track changes over time.")
+    print("4. Advanced ROI Selection: Instead of a simple box, automatically segment physiologically\n"
+          "   relevant areas like the forehead, which often yield a cleaner signal.")
+
+    # Show all plots
+    plt.tight_layout()
     plt.show()
+
+
 # --- Main Execution ---
 if __name__ == "__main__":
     video_data = None
@@ -359,7 +361,7 @@ if __name__ == "__main__":
         if input_path.endswith('.npy'):
             print(f"Loading data from numpy file: {input_path}")
             if not os.path.exists(input_path):
-                 raise FileNotFoundError(f"Numpy file not found: {input_path}")
+                 raise FileNotFoundError
             video_data = np.load(input_path)
             fps = DEFAULT_FPS
             print(f"Using default FPS for .npy file: {fps} Hz")
@@ -367,8 +369,8 @@ if __name__ == "__main__":
             print(f"Processing video file: {input_path}")
             video_data, fps = process_video_to_roi_array(input_path)
 
-    except (IndexError, FileNotFoundError) as e:
-        print(f"Info: No valid video file provided or file not found. {e}")
+    except (IndexError, FileNotFoundError):
+        print(f"No valid video file provided or file not found.")
         print(f"Attempting to load default numpy file: {DEFAULT_VIDEO}")
         try:
             video_data = np.load(DEFAULT_VIDEO)
@@ -379,9 +381,11 @@ if __name__ == "__main__":
             sys.exit(1)
 
     if video_data is not None and video_data.size > 0:
+        # np.info(video_data) # As requested in HW
         print("\n--- Video Data Info ---")
         print(f"Shape: {video_data.shape}")
         print(f"Data Type: {video_data.dtype}")
+        print(f"Min/Max values: {video_data.min()}/{video_data.max()}")
         analyze_pulse(video_data, fps)
     else:
         print("Could not load or process video data. Exiting.")
