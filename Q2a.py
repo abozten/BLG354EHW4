@@ -8,7 +8,7 @@ if not os.path.exists('radar_plots'):
 
 # Radar parameters from the table
 T = 25e-6  # Pulse length in seconds (25 μs)
-W = 9e6    # Swept bandwidth in Hz (9 MHz)
+W = 2e6    # Swept bandwidth in Hz (9 MHz)
 fs = 20e6  # Sampling frequency in Hz (20 MHz)
 TW = 50    # Time-bandwidth product (dimensionless)
 p_ratio = 10  # Oversampling ratio (dimensionless)
