@@ -9,8 +9,13 @@ Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2b.py
 Shape of simulated return y: (501, 12)
 .venvabozten@Arda-MacBook-Air BLG354EhomeworkIV % /Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/.venv/bin/python /
 Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2c.py
-Loaded data from 'rad100.npy', shape: (501, 12)
-No detections found above threshold=90. You might need to lower it.
-
-No targets were detected with the current threshold.
-
+--- Detected Targets ---
+Target 1: Range = 7.93 km, Velocity = -71.18 m/s, Peak Magnitude = 64.76
+Target 2: Range = 8.03 km, Velocity = -71.18 m/s, Peak Magnitude = 60.50
+Target 3: Range = 8.16 km, Velocity = -71.18 m/s, Peak Magnitude = 65.37
+Target 4: Range = 8.29 km, Velocity = -71.18 m/s, Peak Magnitude = 62.80
+Target 5: Range = 8.42 km, Velocity = -71.18 m/s, Peak Magnitude = 60.57
+Target 6: Range = 8.55 km, Velocity = -71.18 m/s, Peak Magnitude = 62.93
+Target 7: Range = 8.68 km, Velocity = -71.18 m/s, Peak Magnitude = 65.63
+Target 8: Range = 8.89 km, Velocity = -71.18 m/s, Peak Magnitude = 63.70
+Target 9: Range = 8.98 km, Velocity = -71.18 m/s, Peak Magnitude = 68.82
