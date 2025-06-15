@@ -341,14 +341,6 @@ def analyze_pulse(video_data, fps):
         print(f"==> Estimated Heart Rate: {final_heart_rate:.2f} BPM")
     
 
-    # --- Step 6: Further Improvements (from assignment) ---
-    print("\n--- Suggestions for Further Improvements ---")
-    print("1. **Robust Detrending/Filtering:** Implement more sophisticated detrending (e.g., using a sliding window median filter) or a more precise bandpass filter design (e.g., Chebyshev type I/II) to better isolate physiological signals from low-frequency motion artifacts and high-frequency noise.")
-    print("2. **Dynamic ROI Selection:** Instead of a fixed ROI within the face, use anatomical landmarks (e.g., forehead or cheeks) derived from facial landmark detection (e.g., Dlib) to more accurately and consistently select physiologically relevant skin regions, which often yield cleaner pulse signals.")
-    print("3. **Adaptive Thresholding for Peak Detection:** Instead of simply taking the `argmax` within the frequency band, apply a peak-finding algorithm (`scipy.signal.find_peaks`) with an adaptive threshold derived from the local noise floor in the power spectrum, ensuring that only significant peaks are considered.")
-    print("4. **Windowing for FFT:** Apply a window function (e.g., Hamming, Hanning) to the ICA source signals *before* performing the FFT to reduce spectral leakage, which can make the peaks in the power spectrum sharper and more distinct.")
-    print("5. **Multiple Sensor Fusion:** If possible, combine information from multiple regions of interest on the face or even different video streams (if available) to get a more robust pulse estimate, potentially using kalman filters for tracking.")
-    print("6. **Motion Artifact Reduction:** Implement advanced motion compensation techniques (e.g., optical flow analysis) to reduce the impact of head movements on the acquired RGB signals, as motion artifacts are a primary source of noise in these measurements.")
     
     # Show all plots (already called after each plot)
     # plt.tight_layout() # This should be called before plt.show() if multiple subplots in one figure
