@@ -323,29 +323,17 @@ def analyze_pulse(video_data, fps):
         all_heart_rates.append(heart_rate_bpm)
         all_peak_powers.append(peak_power)
     
-    # The best estimate is from the component with the highest peak power
-    best_component_idx = np.argmax(all_peak_powers)
+    # The best estimate is from the component with the highest heart rate value
+    best_component_idx = np.argmax(all_heart_rates) # Changed from all_peak_powers
     final_heart_rate = all_heart_rates[best_component_idx]
     
-    print("\n--- Results ---")
+    print("\\n--- Results ---")
     for i in range(3):
         print(f"Heart rate from Component {i+1}: {all_heart_rates[i]:.2f} BPM (Peak Power: {all_peak_powers[i]:.2e})")
         
     print(f"\n==> Best guess is from Component {best_component_idx + 1}.")
     print(f"==> Estimated Heart Rate: {final_heart_rate:.2f} BPM")
     
-    # --- Step 6: Further Improvements ---
-    print("\n--- Suggestions for Further Improvements ---")
-    print("1. Detrending: Apply a detrending algorithm (e.g., `scipy.signal.detrend`) to the\n"
-          "   normalized signals before ICA to remove slow-moving lighting changes.")
-    print("2. Bandpass Filtering: Filter the ICA source signals to only keep frequencies\n"
-          "   within the valid heart rate range (e.g., 0.75-4Hz). This can remove noise\n"
-          "   and improve the accuracy of the peak finding.")
-    print("3. Sliding Window Analysis: Instead of one value for the whole video, calculate\n"
-          "   heart rate over a moving window (e.g., 30 seconds) to track changes over time.")
-    print("4. Advanced ROI Selection: Instead of a simple box, automatically segment physiologically\n"
-          "   relevant areas like the forehead, which often yield a cleaner signal.")
-
     # Show all plots
     plt.tight_layout()
     plt.show()
