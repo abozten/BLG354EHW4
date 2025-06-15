@@ -322,12 +322,12 @@ def analyze_pulse(video_data, fps):
         all_heart_rates.append(heart_rate_bpm)
         all_peak_powers.append(peak_power)
     
-    # Determine the best heart rate estimate from the component with the highest peak power
-    if not all_peak_powers or max(all_peak_powers) == 0:
-        print("\nCould not confidently determine heart rate. No dominant peaks found in the expected range.")
+    # Determine the best heart rate estimate from the component with the highest BPM
+    if not all_heart_rates or max(all_heart_rates) == 0:
+        print("\nCould not confidently determine heart rate. No valid BPM found in the expected range.")
         final_heart_rate = None
     else:
-        best_component_idx = np.argmax(all_peak_powers)
+        best_component_idx = np.argmax(all_heart_rates)
         final_heart_rate = all_heart_rates[best_component_idx]
         
         print("\n--- Results ---")

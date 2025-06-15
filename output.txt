@@ -3,13 +3,12 @@ Original shape: (338688, 2)
 Sampling frequency: 44100
 Mean Squared Error: 0.0055
 
-4E/HW4/BLG354EhomeworkIV/.venv/bin/python /Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/B
-LG354EhomeworkIV/Q2a.py
-Calculated p = fs/W = 2.22
+Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/BLG354EhomeworkIV/Q2a.py
+Calculated p = fs/W = 10.00
 Given oversampling ratio = 10
 
-Generating chirp signal with TW=50, p=2.2222222222222223
-Chirp signal length N = 111 samples
+Generating chirp signal with TW=50, p=10.0
+Chirp signal length N = 500 samples
 
 Plotting chirp signal frequency spectrum...
 
@@ -24,19 +23,20 @@ Convolving delayed signal with matched filter...
 Frequency domain processing with delayed signal...
 
 Range Resolution Analysis:
-Theoretical range resolution = c/(2W) = 16.67 m
-Detected peak at sample 255
+Theoretical range resolution = c/(2W) = 75.00 m
+Detected peak at sample 450
 Detected delay = 100 samples
 Detected range = 750.0 m
 Range error = 750.0 m
 
 === SUMMARY ===
-Chirp parameters: T=25.0μs, W=9.0MHz, TW=50
-Sampling: fs=20.0MHz, N=111 samples
+Chirp parameters: T=25.0μs, W=2.0MHz, TW=50
+Sampling: fs=20.0MHz, N=500 samples
 Target range: 1500m
 Delay time: 10.00μs (200 samples)
 Detected range: 750.0m
-Range resolution: 16.67m
+Range resolution: 75.00m
+
 .venvabozten@Arda-MacBook-Air BLG354EhomeworkIV % /Users/abozten/Desktop/Dersler/Spring2025/BLG35
 4E/HW4/BLG354EhomeworkIV/.venv/bin/python /Users/abozten/Desktop/Dersler/Spring2025/BLG354E/HW4/B
 LG354EhomeworkIV/Q2b.py
