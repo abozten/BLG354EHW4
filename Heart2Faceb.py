@@ -1,3 +1,6 @@
+#Arda Barış Özten - 820220303
+#Berra Mutlu - 820220331
+# Heart Rate Estimation from Facial Video using ICA and Signal Processing
 import cv2
 import sys
 import numpy as np
