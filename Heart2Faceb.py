@@ -203,6 +203,7 @@ def analyze_pulse(video_data, fps):
     plt.ylabel("Average Pixel Value")
     plt.legend()
     plt.grid(True)
+    plt.savefig("plot_raw_rgb_signal.png")
     plt.show() # Display plot immediately
 
     # --- Step 2: Normalization & Detrending ---
@@ -224,6 +225,7 @@ def analyze_pulse(video_data, fps):
     plt.ylabel("Standardized Value")
     plt.legend()
     plt.grid(True)
+    plt.savefig("plot_detrended_normalized_rgb.png")
     plt.show() # Display plot immediately
 
     # --- Step 3: Independent Component Analysis (ICA) ---
@@ -264,6 +266,7 @@ def analyze_pulse(video_data, fps):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig("plot_ica_sources_filtered.png")
     plt.show() # Display plot immediately
     
     # --- Step 4: Power Spectrum Analysis ---
@@ -290,6 +293,7 @@ def analyze_pulse(video_data, fps):
     plt.xlim([min_hz_filter, max_hz_filter])
     plt.legend()
     plt.grid(True)
+    plt.savefig("plot_power_spectra.png")
     plt.show() # Display plot immediately
 
 
